@@ -578,7 +578,7 @@ function initializeTextureEvents() {
                     selectedTexture = await loadTexture(img.src);
                     applySelectedTexture();
                 } catch (error) {
-                    alert('Erreur de chargement de la texture. Veuillez vérifier le fichier ou le chemin.');
+                    alert('Veuillez cliquer sur Mise à Zéro');
                 }
             }
         });
