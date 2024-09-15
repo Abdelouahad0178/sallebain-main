@@ -18,6 +18,7 @@ let selectedTexture = null;
 let texture1 = null, texture2 = null;
 let isDoubleTile = false;
 let firstTileSelected = false;
+let importAuthorized = false; // Variable pour contrôler l'accès à l'importation
 
 // Dimensions initiales des carreaux en mètres
 let defaultTileWidth = 0.6;
@@ -104,14 +105,13 @@ function addEventListeners() {
             setNewTileDimensions(width, height);
             updateTileCount();
         },
-        'tileTextureInput': handleTileTextureInput,
         'singleTileButton': () => { isDoubleTile = false; applySelectedOrientation(); closeTileModal(); },
         'doubleTileButton': () => { isDoubleTile = true; firstTileSelected = false; applySelectedOrientation(); closeTileModal(); alert('Cliquez sur la première texture, puis sur la deuxième.'); },
         'closeModalButton': closeTileModal,
         'orientationSelect': (event) => selectedOrientation = event.target.value,
         'undoAction': undoLastAction,
         'redoAction': redoLastAction,
-        'clearScene': clearScene
+        'clearScene': clearScene,
     };
 
     Object.entries(elements).forEach(([id, handler]) => {
@@ -119,403 +119,61 @@ function addEventListeners() {
         if (element) element.addEventListener(element.tagName === 'INPUT' ? 'input' : 'click', handler, false);
     });
 
+    // Gestion du bouton "Importer Carrelage" pour afficher la modale de mot de passe
+    document.querySelector('label[for="tileTextureInput"]').addEventListener('click', openPasswordModal);
+
+    // Gestion de la visibilité du mot de passe
+    document.getElementById('togglePassword').addEventListener('change', togglePasswordVisibility);
+
+    // Confirmation et annulation du mot de passe
+    document.getElementById('confirmPasswordButton').addEventListener('click', confirmPassword);
+    document.getElementById('cancelPasswordButton').addEventListener('click', closePasswordModal);
+
     // Écouteur pour la touche Supprimer afin de retirer l'objet sélectionné
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Delete') {
             removeObject(); // Appelle la fonction pour supprimer l'objet sélectionné
         }
     });
-}
 
-function handleInteraction(event) {
-    event.preventDefault();
-
-    let x, y;
-    if (event.type === 'touchstart') {
-        if (event.touches.length > 1) return; // Ignore les interactions multi-touch
-        const touch = event.changedTouches[0];
-        x = touch.clientX;
-        y = touch.clientY;
-    } else {
-        x = event.clientX;
-        y = event.clientY;
-    }
-
-    mouse.x = (x / window.innerWidth) * 2 - 1;
-    mouse.y = -(y / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects([...walls, floor, ...objects], true);
-
-    if (intersects.length > 0) {
-        const clickedObject = intersects[0].object;
-        console.log('Objet cliqué :', clickedObject);
-
-        // Incrémente le compteur de clics
-        clickCount++;
-
-        // Réinitialise le compteur après un délai si pas de double ou triple clic
-        clearTimeout(clickTimeout);
-        clickTimeout = setTimeout(() => {
-            clickCount = 0;
-        }, 500);
-
-        // Vérifie si c'est un triple clic
-        if (clickCount === 3) {
-            handleTripleClick(clickedObject);
-            clickCount = 0; // Réinitialise le compteur après un triple clic
-        } else if (clickCount === 2) {
-            handleDoubleClick(clickedObject);
+    // Empêcher l'action par défaut sur l'input de fichier pour forcer l'importation via la modale
+    document.getElementById('tileTextureInput').addEventListener('click', (e) => {
+        if (!importAuthorized) {
+            e.preventDefault();
         }
-
-        // Sélection de l'objet
-        selectObject(clickedObject);
-    } else {
-        console.log('Aucun objet détecté lors du clic/tap.');
-        transformControls.detach();
-    }
-}
-
-function handleDoubleClick(object) {
-    // Permettre le double clic seulement pour les objets sanitaires
-    if (objects.includes(object) && object.userData.isMovable) {
-        transformControls.attach(object); // Attacher les contrôles pour déplacer l'objet sanitaire
-        console.log('Double clic détecté sur un objet sanitaire :', object);
-    } else {
-        console.log('Double clic ignoré sur l\'objet :', object);
-        transformControls.detach(); // Ne pas attacher pour les murs ou le sol
-    }
-}
-
-function handleTripleClick(object) {
-    // Permettre le triple clic seulement pour changer les dimensions et textures du sol ou des murs
-    if (object === floor || walls.includes(object)) {
-        console.log('Triple clic détecté pour changer les dimensions ou texture :', object);
-        openTileModal(); // Ouvre le modal pour les dimensions ou texture
-    } else {
-        console.log('Triple clic ignoré sur un objet sanitaire.');
-    }
-}
-
-function selectObject(object) {
-    // Monte jusqu'à l'objet parent si l'objet sélectionné est un sous-mesh
-    while (object.parent && object.parent !== scene) {
-        object = object.parent;
-    }
-
-    if (object === floor) {
-        selectedObject = floor;
-        selectedWall = null;
-        console.log('Sol sélectionné avec succès.');
-        transformControls.detach(); // Détacher les contrôles du sol car il n'est pas déplaçable
-    } else if (walls.includes(object)) {
-        selectedWall = object;
-        selectedObject = null;
-        console.log('Mur sélectionné :', selectedWall);
-        transformControls.detach(); // Détacher les contrôles car les murs ne sont pas déplaçables
-    } else if (objects.includes(object)) {
-        selectedObject = object;
-        selectedWall = null;
-        console.log('Objet sanitaire sélectionné :', selectedObject);
-
-        // Attacher le transform control si l'objet est sélectionné et déplaçable
-        if (selectedObject.userData.isMovable) {
-            transformControls.attach(selectedObject);
-            console.log('Transform controls attached.');
-        } else {
-            console.log('L\'objet sélectionné n\'est pas déplaçable.');
-            transformControls.detach();
-        }
-    } else {
-        selectedObject = null;
-        selectedWall = null;
-        console.log('Aucun objet ou mur n\'a été sélectionné.');
-        transformControls.detach();
-    }
-}
-
-function addObject(model, type) {
-    model.userData.type = type;
-    model.userData.isMovable = true; // Assure que l'objet est déplaçable
-    scene.add(model);
-    objects.push(model);
-    selectObject(model); // Sélectionne automatiquement l'objet ajouté
-    saveAction('add', model);
-}
-
-function removeObject() {
-    if (selectedObject && selectedObject.userData.isMovable) {
-        saveAction('remove', selectedObject);
-        scene.remove(selectedObject);
-        objects = objects.filter(obj => obj !== selectedObject);
-        transformControls.detach();
-        selectedObject = null;
-        alert('Objet supprimé avec succès.');
-    } else {
-        alert('Aucun objet sélectionné à supprimer.');
-    }
-}
-
-function undoLastAction() {
-    if (actionHistory.length > 0) {
-        const lastAction = actionHistory.pop();
-        redoStack.push(lastAction);
-
-        switch (lastAction.action) {
-            case 'add':
-                scene.remove(lastAction.object);
-                objects = objects.filter(obj => obj !== lastAction.object);
-                break;
-            case 'remove':
-                scene.add(lastAction.object);
-                objects.push(lastAction.object);
-                break;
-            case 'applyTexture':
-                lastAction.object.material.map = lastAction.previousTexture || null;
-                lastAction.object.material.needsUpdate = true;
-                break;
-            case 'applyCheckerboard':
-                lastAction.object.material = lastAction.previousMaterial;
-                lastAction.object.material.needsUpdate = true;
-                break;
-            default:
-                console.warn('Action non reconnue:', lastAction.action);
-        }
-    } else {
-        alert('Aucune action à annuler.');
-    }
-}
-
-function redoLastAction() {
-    if (redoStack.length > 0) {
-        const lastRedo = redoStack.pop();
-        actionHistory.push(lastRedo);
-
-        switch (lastRedo.action) {
-            case 'add':
-                scene.add(lastRedo.object);
-                objects.push(lastRedo.object);
-                break;
-            case 'remove':
-                scene.remove(lastRedo.object);
-                objects = objects.filter(obj => obj !== lastRedo.object);
-                break;
-            case 'applyTexture':
-                adjustTextureScale(lastRedo.object, lastRedo.texture);
-                break;
-            case 'applyCheckerboard':
-                adjustCheckerboardScale(lastRedo.object, lastRedo.material);
-                break;
-            default:
-                console.warn('Action non reconnue:', lastRedo.action);
-        }
-    } else {
-        alert('Aucune action à rétablir.');
-    }
-}
-
-function clearScene() {
-    objects.forEach(obj => scene.remove(obj));
-    walls = [];
-    floor = null;
-    objects = [];
-    selectedObject = null;
-    selectedWall = null;
-    actionHistory = [];
-    redoStack = [];
-    createWalls();
-    createFloor();
-    alert('La scène a été réinitialisée.');
-}
-
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-}
-
-function saveAction(action, object, texture = null) {
-    actionHistory.push({
-        action: action,
-        object: object,
-        texture: texture,
-        previousTexture: object && object.material ? object.material.map : null,
-        previousMaterial: object && object.material ? object.material : null,
     });
-    redoStack = [];
+
+    // Gestion de l'importation des carrelages après validation
+    document.getElementById('tileTextureInput').addEventListener('change', handleTileTextureInput);
 }
 
-function setTransformMode(mode) {
-    if (['translate', 'rotate'].includes(mode)) {
-        transformControls.setMode(mode);
+function openPasswordModal() {
+    document.getElementById('passwordModal').classList.remove('hidden');
+}
+
+function closePasswordModal() {
+    document.getElementById('passwordModal').classList.add('hidden');
+    document.getElementById('passwordInput').value = ''; // Réinitialiser le champ de mot de passe
+    importAuthorized = false; // Réinitialiser l'autorisation d'importation
+}
+
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('passwordInput');
+    passwordInput.type = this.checked ? 'text' : 'password';
+}
+
+function confirmPassword() {
+    const password = document.getElementById('passwordInput').value;
+    if (password === "sara") { // Remplacez 'votreMotDePasse' par le mot de passe réel
+        importAuthorized = true; // Autorise l'importation de carrelage
+        document.getElementById('tileTextureInput').click(); // Lancer l'importation du carrelage après la validation du mot de passe
+        closePasswordModal();
     } else {
-        console.error('Mode de transformation non reconnu :', mode);
+        alert("Mot de passe incorrect. Importation annulée.");
     }
 }
 
-function applySurfaceDimensions() {
-    const floorWidth = parseFloat(document.getElementById('floorWidth').value) || 5;
-    const floorDepth = parseFloat(document.getElementById('floorDepth').value) || 5;
-    const wall1Width = parseFloat(document.getElementById('wall1Width').value) || 5;
-    const wall2Width = parseFloat(document.getElementById('wall2Width').value) || 5;
-    const wallHeight = parseFloat(document.getElementById('wallHeight').value) || 3;
-
-    if (floor) {
-        floor.geometry.dispose();
-        floor.geometry = new THREE.PlaneGeometry(floorWidth, floorDepth);
-    }
-
-    if (walls[0]) {
-        walls[0].geometry.dispose();
-        walls[0].geometry = new THREE.BoxGeometry(wall1Width, wallHeight, 0.2);
-        walls[0].position.set(0, wallHeight / 2, -floorDepth / 2 - 0.1);
-    }
-
-    if (walls[1]) {
-        walls[1].geometry.dispose();
-        walls[1].geometry = new THREE.BoxGeometry(wall2Width, wallHeight, 0.2);
-        walls[1].position.set(-floorWidth / 2 - 0.1, wallHeight / 2, 0);
-        walls[1].rotation.y = Math.PI / 2;
-    }
-
-    updateTileCount();
-    alert('Dimensions du sol et des murs appliquées avec succès.');
-}
-
-function updateTileCount() {
-    // Calcul du nombre de carreaux pour le sol
-    const floorTileX = Math.ceil(floor.geometry.parameters.width / currentTileWidth);
-    const floorTileY = Math.ceil(floor.geometry.parameters.height / currentTileHeight);
-    console.log(`Nombre de carreaux sur le sol : ${floorTileX} x ${floorTileY}`);
-
-    // Calcul du nombre de carreaux pour le mur 1
-    if (walls[0]) {
-        const wallTileX1 = Math.ceil(walls[0].geometry.parameters.width / currentTileWidth);
-        const wallTileY1 = Math.ceil(walls[0].geometry.parameters.height / currentTileHeight);
-        console.log(`Nombre de carreaux sur le mur 1 : ${wallTileX1} x ${wallTileY1}`);
-    }
-
-    // Calcul du nombre de carreaux pour le mur 2
-    if (walls[1]) {
-        const wallTileX2 = Math.ceil(walls[1].geometry.parameters.width / currentTileWidth);
-        const wallTileY2 = Math.ceil(walls[1].geometry.parameters.height / currentTileHeight);
-        console.log(`Nombre de carreaux sur le mur 2 : ${wallTileX2} x ${wallTileY2}`);
-    }
-}
-
-function saveScene() {
-    try {
-        const sceneData = {
-            walls: walls.map(wall => ({
-                position: wall.position.toArray(),
-                rotation: wall.rotation.toArray(),
-                texture: wall.material.map ? wall.material.map.image.src : null
-            })),
-            floor: {
-                position: floor.position.toArray(),
-                rotation: floor.rotation.toArray(),
-                texture: floor.material.map ? floor.material.map.image.src : null
-            },
-            objects: objects.filter(obj => obj.userData.isMovable).map(obj => ({
-                type: obj.userData.type,
-                position: obj.position.toArray(),
-                rotation: obj.rotation.toArray(),
-                scale: obj.scale.toArray()
-            }))
-        };
-
-        localStorage.setItem('bathroomScene', JSON.stringify(sceneData));
-        alert('Scène sauvegardée avec succès!');
-    } catch (error) {
-        alert('Erreur lors de la sauvegarde de la scène. Veuillez vérifier les paramètres et réessayer.');
-    }
-}
-
-function saveSceneAsImage() {
-    try {
-        renderer.render(scene, camera);
-        const dataURL = renderer.domElement.toDataURL('image/png');
-
-        const a = document.createElement('a');
-        a.href = dataURL;
-        a.download = 'bathroom_scene.png';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        alert('La scène a été sauvegardée en tant qu\'image!');
-    } catch (error) {
-        alert('Erreur lors de la sauvegarde de l\'image. Veuillez réessayer.');
-    }
-}
-
-function loadTexturesFromJson() {
-    fetch('merged.json')
-        .then(response => response.json())
-        .then(data => {
-            const texturePalette = document.getElementById('texturePalette');
-            data.forEach(texture => {
-                const img = document.createElement('img');
-                img.src = texture.src;
-                img.alt = texture.alt;
-                img.classList.add('texture-option');
-                texturePalette.appendChild(img);
-            });
-            initializeTextureEvents();
-        })
-        .catch(error => console.error('Erreur de chargement des textures depuis merged.json:', error));
-}
-
-function handleModelFile(event) {
-    const file = event.target.files[0];
-    const type = event.target.dataset.type;
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const arrayBuffer = e.target.result;
-            const extension = file.name.split('.').pop().toLowerCase();
-
-            if (extension === 'gltf' || extension === 'glb') {
-                gltfLoader.parse(arrayBuffer, '', function (gltf) {
-                    handleModelLoad(gltf.scene, type);
-                });
-            } else if (extension === 'obj') {
-                const text = new TextDecoder().decode(arrayBuffer);
-                const objModel = objLoader.parse(text);
-                handleModelLoad(objModel, type);
-            } else if (extension === 'fbx') {
-                fbxLoader.parse(arrayBuffer, function (fbx) {
-                    handleModelLoad(fbx, type);
-                });
-            } else {
-                alert('Format de modèle non supporté. Veuillez télécharger des fichiers .gltf, .glb, .obj ou .fbx.');
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    }
-}
-
-function handleModelLoad(model, type) {
-    model.rotation.set(0, 0, 0);
-    model.scale.set(1, 1, 1);
-    centerModel(model);
-
-    model.userData.type = type;
-    model.userData.isMovable = true; // Définir l'objet comme déplaçable
-    console.log('model.userData.type =', type);
-    console.log('model.userData.isMovable =', model.userData.isMovable);
-
-    if (type === 'sink') sinkModel = model;
-    else if (type === 'mirror') mirrorModel = model;
-    else if (type === 'bidet') bidetModel = model;
-}
-
+// Fonction pour gérer l'importation de la texture de carrelage
 function handleTileTextureInput(event) {
     const file = event.target.files[0];
     if (file) {
@@ -529,28 +187,17 @@ function handleTileTextureInput(event) {
                 } else {
                     alert('Veuillez sélectionner un mur ou le sol avant de charger une texture.');
                 }
+                importAuthorized = false; // Réinitialise l'autorisation après l'importation
             }, undefined, (error) => {
                 alert('Erreur lors du chargement de la texture. Veuillez vérifier le fichier.');
+                importAuthorized = false; // Réinitialise l'autorisation après une erreur
             });
         };
         reader.readAsDataURL(file);
     }
 }
 
-function centerModel(model) {
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 1.25 / maxDim;
-    model.scale.multiplyScalar(scale);
-
-    model.position.sub(center.multiplyScalar(scale));
-    model.position.y = size.y * scale / 2;
-    model.position.z = -2.4;
-}
-
+// Fonction pour initialiser les événements liés aux textures
 function initializeTextureEvents() {
     document.querySelectorAll('.texture-option').forEach((img) => {
         img.addEventListener('click', async () => {
@@ -585,6 +232,7 @@ function initializeTextureEvents() {
     });
 }
 
+// Fonction pour charger une texture depuis une URL
 function loadTexture(src) {
     return new Promise((resolve, reject) => {
         const textureLoader = new THREE.TextureLoader();
@@ -601,6 +249,7 @@ function loadTexture(src) {
     });
 }
 
+// Fonction pour appliquer la texture sélectionnée à l'objet ou mur sélectionné
 function applySelectedTexture() {
     if (!selectedTexture) {
         alert('Aucune texture sélectionnée. Veuillez choisir une texture.');
@@ -618,6 +267,7 @@ function applySelectedTexture() {
     }
 }
 
+// Fonction pour ajuster l'échelle de la texture appliquée
 function adjustTextureScale(object, texture) {
     if (!texture) {
         alert('Erreur : La texture n\'est pas chargée. Veuillez réessayer de sélectionner une texture.');
@@ -647,6 +297,7 @@ function adjustTextureScale(object, texture) {
     object.material.needsUpdate = true;
 }
 
+// Fonction pour appliquer l'orientation sélectionnée
 function applySelectedOrientation() {
     if (selectedWall) {
         selectedWall.userData.isHorizontal = (selectedOrientation === 'horizontal');
@@ -657,6 +308,7 @@ function applySelectedOrientation() {
     }
 }
 
+// Fonction pour définir de nouvelles dimensions pour les carreaux
 function setNewTileDimensions(width, height) {
     currentTileWidth = width;
     currentTileHeight = height;
@@ -664,6 +316,7 @@ function setNewTileDimensions(width, height) {
     alert('Les dimensions des prochains carreaux seront : ' + currentTileWidth + 'm x ' + currentTileHeight + 'm.');
 }
 
+// Fonction pour filtrer les textures disponibles
 function filterTiles() {
     const searchInput = document.getElementById('searchTile').value.toLowerCase();
     const textureOptions = document.querySelectorAll('.texture-option');
@@ -674,14 +327,17 @@ function filterTiles() {
     });
 }
 
+// Fonction pour ouvrir la modale des carreaux
 function openTileModal() {
     document.getElementById('tileModal').classList.remove('hidden');
 }
 
+// Fonction pour fermer la modale des carreaux
 function closeTileModal() {
     document.getElementById('tileModal').classList.add('hidden');
 }
 
+// Fonction pour créer un matériau à damier avec deux textures
 function createCheckerboardMaterial() {
     if (!texture1 || !texture2) {
         alert('Les textures alternées ne sont pas correctement chargées. Réessayez de les sélectionner.');
@@ -743,6 +399,7 @@ function createCheckerboardMaterial() {
     }
 }
 
+// Fonction pour ajuster l'échelle du matériau à damier
 function adjustCheckerboardScale(object, shaderMaterial) {
     const objectWidth = object.geometry.parameters.width || object.scale.x;
     const objectHeight = object.geometry.parameters.height || object.scale.y;
@@ -756,6 +413,7 @@ function adjustCheckerboardScale(object, shaderMaterial) {
     shaderMaterial.uniforms.tileSizeY2.value = repeatY;
 }
 
+// Fonction pour créer les murs de la scène
 function createWalls() {
     const wallWidth = 5;
     const wallHeight = 3;
@@ -782,6 +440,7 @@ function createWalls() {
     }
 }
 
+// Fonction pour créer le sol de la scène
 function createFloor() {
     const floorGeometry = new THREE.PlaneGeometry(5, 5);
     const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
@@ -792,4 +451,427 @@ function createFloor() {
     objects.push(floor);
 }
 
+// Fonction pour gérer la redimension de la fenêtre
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Fonction d'animation de la scène
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+// Fonction pour sauvegarder une action dans l'historique
+function saveAction(action, object, texture = null) {
+    actionHistory.push({
+        action: action,
+        object: object,
+        texture: texture,
+        previousTexture: object && object.material ? object.material.map : null,
+        previousMaterial: object && object.material ? object.material : null,
+    });
+    redoStack = [];
+}
+
+// Fonction pour définir le mode de transformation (translation ou rotation)
+function setTransformMode(mode) {
+    if (['translate', 'rotate'].includes(mode)) {
+        transformControls.setMode(mode);
+    } else {
+        console.error('Mode de transformation non reconnu :', mode);
+    }
+}
+
+// Fonction pour appliquer les dimensions du sol et des murs
+function applySurfaceDimensions() {
+    const floorWidth = parseFloat(document.getElementById('floorWidth').value) || 5;
+    const floorDepth = parseFloat(document.getElementById('floorDepth').value) || 5;
+    const wall1Width = parseFloat(document.getElementById('wall1Width').value) || 5;
+    const wall2Width = parseFloat(document.getElementById('wall2Width').value) || 5;
+    const wallHeight = parseFloat(document.getElementById('wallHeight').value) || 3;
+
+    if (floor) {
+        floor.geometry.dispose();
+        floor.geometry = new THREE.PlaneGeometry(floorWidth, floorDepth);
+    }
+
+    if (walls[0]) {
+        walls[0].geometry.dispose();
+        walls[0].geometry = new THREE.BoxGeometry(wall1Width, wallHeight, 0.2);
+        walls[0].position.set(0, wallHeight / 2, -floorDepth / 2 - 0.1);
+    }
+
+    if (walls[1]) {
+        walls[1].geometry.dispose();
+        walls[1].geometry = new THREE.BoxGeometry(wall2Width, wallHeight, 0.2);
+        walls[1].position.set(-floorWidth / 2 - 0.1, wallHeight / 2, 0);
+        walls[1].rotation.y = Math.PI / 2;
+    }
+
+    updateTileCount();
+    alert('Dimensions du sol et des murs appliquées avec succès.');
+}
+
+// Fonction pour mettre à jour le nombre de carreaux
+function updateTileCount() {
+    // Calcul du nombre de carreaux pour le sol
+    const floorTileX = Math.ceil(floor.geometry.parameters.width / currentTileWidth);
+    const floorTileY = Math.ceil(floor.geometry.parameters.height / currentTileHeight);
+    console.log(`Nombre de carreaux sur le sol : ${floorTileX} x ${floorTileY}`);
+
+    // Calcul du nombre de carreaux pour le mur 1
+    if (walls[0]) {
+        const wallTileX1 = Math.ceil(walls[0].geometry.parameters.width / currentTileWidth);
+        const wallTileY1 = Math.ceil(walls[0].geometry.parameters.height / currentTileHeight);
+        console.log(`Nombre de carreaux sur le mur 1 : ${wallTileX1} x ${wallTileY1}`);
+    }
+
+    // Calcul du nombre de carreaux pour le mur 2
+    if (walls[1]) {
+        const wallTileX2 = Math.ceil(walls[1].geometry.parameters.width / currentTileWidth);
+        const wallTileY2 = Math.ceil(walls[1].geometry.parameters.height / currentTileHeight);
+        console.log(`Nombre de carreaux sur le mur 2 : ${wallTileX2} x ${wallTileY2}`);
+    }
+}
+
+// Fonction pour sauvegarder la scène
+function saveScene() {
+    try {
+        const sceneData = {
+            walls: walls.map(wall => ({
+                position: wall.position.toArray(),
+                rotation: wall.rotation.toArray(),
+                texture: wall.material.map ? wall.material.map.image.src : null
+            })),
+            floor: {
+                position: floor.position.toArray(),
+                rotation: floor.rotation.toArray(),
+                texture: floor.material.map ? floor.material.map.image.src : null
+            },
+            objects: objects.filter(obj => obj.userData.isMovable).map(obj => ({
+                type: obj.userData.type,
+                position: obj.position.toArray(),
+                rotation: obj.rotation.toArray(),
+                scale: obj.scale.toArray()
+            }))
+        };
+
+        localStorage.setItem('bathroomScene', JSON.stringify(sceneData));
+        alert('Scène sauvegardée avec succès!');
+    } catch (error) {
+        alert('Erreur lors de la sauvegarde de la scène. Veuillez vérifier les paramètres et réessayer.');
+    }
+}
+
+// Fonction pour sauvegarder la scène en tant qu'image
+function saveSceneAsImage() {
+    try {
+        renderer.render(scene, camera);
+        const dataURL = renderer.domElement.toDataURL('image/png');
+
+        const a = document.createElement('a');
+        a.href = dataURL;
+        a.download = 'bathroom_scene.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        alert('La scène a été sauvegardée en tant qu\'image!');
+    } catch (error) {
+        alert('Erreur lors de la sauvegarde de l\'image. Veuillez réessayer.');
+    }
+}
+
+// Fonction pour charger les textures depuis un fichier JSON
+function loadTexturesFromJson() {
+    fetch('merged.json')
+        .then(response => response.json())
+        .then(data => {
+            const texturePalette = document.getElementById('texturePalette');
+            data.forEach(texture => {
+                const img = document.createElement('img');
+                img.src = texture.src;
+                img.alt = texture.alt;
+                img.classList.add('texture-option');
+                texturePalette.appendChild(img);
+            });
+            initializeTextureEvents();
+        })
+        .catch(error => console.error('Erreur de chargement des textures depuis merged.json:', error));
+}
+
+// Fonction pour gérer le chargement de modèles 3D
+function handleModelFile(event) {
+    const file = event.target.files[0];
+    const type = event.target.dataset.type;
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const arrayBuffer = e.target.result;
+            const extension = file.name.split('.').pop().toLowerCase();
+
+            if (extension === 'gltf' || extension === 'glb') {
+                gltfLoader.parse(arrayBuffer, '', function (gltf) {
+                    handleModelLoad(gltf.scene, type);
+                });
+            } else if (extension === 'obj') {
+                const text = new TextDecoder().decode(arrayBuffer);
+                const objModel = objLoader.parse(text);
+                handleModelLoad(objModel, type);
+            } else if (extension === 'fbx') {
+                fbxLoader.parse(arrayBuffer, function (fbx) {
+                    handleModelLoad(fbx, type);
+                });
+            } else {
+                alert('Format de modèle non supporté. Veuillez télécharger des fichiers .gltf, .glb, .obj ou .fbx.');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+}
+
+// Fonction pour gérer le chargement d'un modèle et l'ajouter à la scène
+function handleModelLoad(model, type) {
+    model.rotation.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
+    centerModel(model);
+
+    model.userData.type = type;
+    model.userData.isMovable = true; // Définir l'objet comme déplaçable
+
+    if (type === 'sink') sinkModel = model;
+    else if (type === 'mirror') mirrorModel = model;
+    else if (type === 'bidet') bidetModel = model;
+}
+
+// Fonction pour centrer un modèle 3D chargé
+function centerModel(model) {
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 1.25 / maxDim;
+    model.scale.multiplyScalar(scale);
+
+    model.position.sub(center.multiplyScalar(scale));
+    model.position.y = size.y * scale / 2;
+    model.position.z = -2.4;
+}
+
+// Fonction pour gérer les interactions par clic
+function handleInteraction(event) {
+    event.preventDefault();
+
+    let x, y;
+    if (event.type === 'touchstart') {
+        if (event.touches.length > 1) return; // Ignore les interactions multi-touch
+        const touch = event.changedTouches[0];
+        x = touch.clientX;
+        y = touch.clientY;
+    } else {
+        x = event.clientX;
+        y = event.clientY;
+    }
+
+    mouse.x = (x / window.innerWidth) * 2 - 1;
+    mouse.y = -(y / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects([...walls, floor, ...objects], true);
+
+    if (intersects.length > 0) {
+        const clickedObject = intersects[0].object;
+        console.log('Objet cliqué :', clickedObject);
+
+        // Incrémente le compteur de clics
+        clickCount++;
+
+        // Réinitialise le compteur après un délai si pas de double ou triple clic
+        clearTimeout(clickTimeout);
+        clickTimeout = setTimeout(() => {
+            clickCount = 0;
+        }, 500);
+
+        // Vérifie si c'est un triple clic
+        if (clickCount === 3) {
+            handleTripleClick(clickedObject);
+            clickCount = 0; // Réinitialise le compteur après un triple clic
+        } else if (clickCount === 2) {
+            handleDoubleClick(clickedObject);
+        }
+
+        // Sélection de l'objet
+        selectObject(clickedObject);
+    } else {
+        console.log('Aucun objet détecté lors du clic/tap.');
+        transformControls.detach();
+    }
+}
+
+// Fonction pour gérer le double clic sur un objet
+function handleDoubleClick(object) {
+    // Permettre le double clic seulement pour les objets sanitaires
+    if (objects.includes(object) && object.userData.isMovable) {
+        transformControls.attach(object); // Attacher les contrôles pour déplacer l'objet sanitaire
+        console.log('Double clic détecté sur un objet sanitaire :', object);
+    } else {
+        console.log('Double clic ignoré sur l\'objet :', object);
+        transformControls.detach(); // Ne pas attacher pour les murs ou le sol
+    }
+}
+
+// Fonction pour gérer le triple clic sur un objet ou mur
+function handleTripleClick(object) {
+    // Permettre le triple clic seulement pour changer les dimensions et textures du sol ou des murs
+    if (object === floor || walls.includes(object)) {
+        console.log('Triple clic détecté pour changer les dimensions ou texture :', object);
+        openTileModal(); // Ouvre le modal pour les dimensions ou texture
+    } else {
+        console.log('Triple clic ignoré sur un objet sanitaire.');
+    }
+}
+
+// Fonction pour sélectionner un objet dans la scène
+function selectObject(object) {
+    // Monte jusqu'à l'objet parent si l'objet sélectionné est un sous-mesh
+    while (object.parent && object.parent !== scene) {
+        object = object.parent;
+    }
+
+    if (object === floor) {
+        selectedObject = floor;
+        selectedWall = null;
+        console.log('Sol sélectionné avec succès.');
+        transformControls.detach(); // Détacher les contrôles du sol car il n'est pas déplaçable
+    } else if (walls.includes(object)) {
+        selectedWall = object;
+        selectedObject = null;
+        console.log('Mur sélectionné :', selectedWall);
+        transformControls.detach(); // Détacher les contrôles car les murs ne sont pas déplaçables
+    } else if (objects.includes(object)) {
+        selectedObject = object;
+        selectedWall = null;
+        console.log('Objet sanitaire sélectionné :', selectedObject);
+
+        // Attacher le transform control si l'objet est sélectionné et déplaçable
+        if (selectedObject.userData.isMovable) {
+            transformControls.attach(selectedObject);
+            console.log('Transform controls attached.');
+        } else {
+            console.log('L\'objet sélectionné n\'est pas déplaçable.');
+            transformControls.detach();
+        }
+    } else {
+        selectedObject = null;
+        selectedWall = null;
+        console.log('Aucun objet ou mur n\'a été sélectionné.');
+        transformControls.detach();
+    }
+}
+
+// Fonction pour ajouter un objet à la scène
+function addObject(model, type) {
+    model.userData.type = type;
+    model.userData.isMovable = true; // Assure que l'objet est déplaçable
+    scene.add(model);
+    objects.push(model);
+    selectObject(model); // Sélectionne automatiquement l'objet ajouté
+    saveAction('add', model);
+}
+
+// Fonction pour supprimer l'objet sélectionné
+function removeObject() {
+    if (selectedObject && selectedObject.userData.isMovable) {
+        saveAction('remove', selectedObject);
+        scene.remove(selectedObject);
+        objects = objects.filter(obj => obj !== selectedObject);
+        transformControls.detach();
+        selectedObject = null;
+        alert('Objet supprimé avec succès.');
+    } else {
+        alert('Aucun objet sélectionné à supprimer.');
+    }
+}
+
+// Fonction pour annuler la dernière action
+function undoLastAction() {
+    if (actionHistory.length > 0) {
+        const lastAction = actionHistory.pop();
+        redoStack.push(lastAction);
+
+        switch (lastAction.action) {
+            case 'add':
+                scene.remove(lastAction.object);
+                objects = objects.filter(obj => obj !== lastAction.object);
+                break;
+            case 'remove':
+                scene.add(lastAction.object);
+                objects.push(lastAction.object);
+                break;
+            case 'applyTexture':
+                lastAction.object.material.map = lastAction.previousTexture || null;
+                lastAction.object.material.needsUpdate = true;
+                break;
+            case 'applyCheckerboard':
+                lastAction.object.material = lastAction.previousMaterial;
+                lastAction.object.material.needsUpdate = true;
+                break;
+            default:
+                console.warn('Action non reconnue:', lastAction.action);
+        }
+    } else {
+        alert('Aucune action à annuler.');
+    }
+}
+
+// Fonction pour rétablir la dernière action annulée
+function redoLastAction() {
+    if (redoStack.length > 0) {
+        const lastRedo = redoStack.pop();
+        actionHistory.push(lastRedo);
+
+        switch (lastRedo.action) {
+            case 'add':
+                scene.add(lastRedo.object);
+                objects.push(lastRedo.object);
+                break;
+            case 'remove':
+                scene.remove(lastRedo.object);
+                objects = objects.filter(obj => obj !== lastRedo.object);
+                break;
+            case 'applyTexture':
+                adjustTextureScale(lastRedo.object, lastRedo.texture);
+                break;
+            case 'applyCheckerboard':
+                adjustCheckerboardScale(lastRedo.object, lastRedo.material);
+                break;
+            default:
+                console.warn('Action non reconnue:', lastRedo.action);
+        }
+    } else {
+        alert('Aucune action à rétablir.');
+    }
+}
+
+// Fonction pour réinitialiser la scène
+function clearScene() {
+    objects.forEach(obj => scene.remove(obj));
+    walls = [];
+    floor = null;
+    objects = [];
+    selectedObject = null;
+    selectedWall = null;
+    actionHistory = [];
+    redoStack = [];
+    createWalls();
+    createFloor();
+    alert('La scène a été réinitialisée.');
+}
+
+// Initialiser la scène à l'ouverture
 window.addEventListener('load', init);
