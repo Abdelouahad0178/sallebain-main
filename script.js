@@ -35,6 +35,12 @@ document.addEventListener('DOMContentLoaded', function () {
     init();
     addEventListeners();
     loadTexturesFromJson();
+
+    // Ajoute un écouteur d'événement pour le sélecteur de couleur de fond
+    document.getElementById('bgColorPicker').addEventListener('input', function (event) {
+        const color = event.target.value;
+        scene.background = new THREE.Color(color); // Change la couleur du fond
+    });
 });
 
 function init() {
@@ -65,10 +71,10 @@ function init() {
     camera.position.set(0, 2, 6);
     camera.lookAt(0, 1.5, 0);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); // Augmente l'intensité pour éclaircir la scène
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Augmente l'intensité pour plus de luminosité
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
 
@@ -173,7 +179,6 @@ function confirmPassword() {
     }
 }
 
-// Fonction pour gérer l'importation de la texture de carrelage
 function handleTileTextureInput(event) {
     const file = event.target.files[0];
     if (file) {
@@ -197,7 +202,6 @@ function handleTileTextureInput(event) {
     }
 }
 
-// Fonction pour initialiser les événements liés aux textures
 function initializeTextureEvents() {
     document.querySelectorAll('.texture-option').forEach((img) => {
         img.addEventListener('click', async () => {
@@ -232,7 +236,6 @@ function initializeTextureEvents() {
     });
 }
 
-// Fonction pour charger une texture depuis une URL
 function loadTexture(src) {
     return new Promise((resolve, reject) => {
         const textureLoader = new THREE.TextureLoader();
@@ -249,7 +252,6 @@ function loadTexture(src) {
     });
 }
 
-// Fonction pour appliquer la texture sélectionnée à l'objet ou mur sélectionné
 function applySelectedTexture() {
     if (!selectedTexture) {
         alert('Aucune texture sélectionnée. Veuillez choisir une texture.');
@@ -267,7 +269,6 @@ function applySelectedTexture() {
     }
 }
 
-// Fonction pour ajuster l'échelle de la texture appliquée
 function adjustTextureScale(object, texture) {
     if (!texture) {
         alert('Erreur : La texture n\'est pas chargée. Veuillez réessayer de sélectionner une texture.');
@@ -297,7 +298,6 @@ function adjustTextureScale(object, texture) {
     object.material.needsUpdate = true;
 }
 
-// Fonction pour appliquer l'orientation sélectionnée
 function applySelectedOrientation() {
     if (selectedWall) {
         selectedWall.userData.isHorizontal = (selectedOrientation === 'horizontal');
@@ -308,7 +308,6 @@ function applySelectedOrientation() {
     }
 }
 
-// Fonction pour définir de nouvelles dimensions pour les carreaux
 function setNewTileDimensions(width, height) {
     currentTileWidth = width;
     currentTileHeight = height;
@@ -316,7 +315,6 @@ function setNewTileDimensions(width, height) {
     alert('Les dimensions des prochains carreaux seront : ' + currentTileWidth + 'm x ' + currentTileHeight + 'm.');
 }
 
-// Fonction pour filtrer les textures disponibles
 function filterTiles() {
     const searchInput = document.getElementById('searchTile').value.toLowerCase();
     const textureOptions = document.querySelectorAll('.texture-option');
@@ -327,17 +325,14 @@ function filterTiles() {
     });
 }
 
-// Fonction pour ouvrir la modale des carreaux
 function openTileModal() {
     document.getElementById('tileModal').classList.remove('hidden');
 }
 
-// Fonction pour fermer la modale des carreaux
 function closeTileModal() {
     document.getElementById('tileModal').classList.add('hidden');
 }
 
-// Fonction pour créer un matériau à damier avec deux textures
 function createCheckerboardMaterial() {
     if (!texture1 || !texture2) {
         alert('Les textures alternées ne sont pas correctement chargées. Réessayez de les sélectionner.');
@@ -399,7 +394,6 @@ function createCheckerboardMaterial() {
     }
 }
 
-// Fonction pour ajuster l'échelle du matériau à damier
 function adjustCheckerboardScale(object, shaderMaterial) {
     const objectWidth = object.geometry.parameters.width || object.scale.x;
     const objectHeight = object.geometry.parameters.height || object.scale.y;
@@ -413,7 +407,6 @@ function adjustCheckerboardScale(object, shaderMaterial) {
     shaderMaterial.uniforms.tileSizeY2.value = repeatY;
 }
 
-// Fonction pour créer les murs de la scène
 function createWalls() {
     const wallWidth = 5;
     const wallHeight = 3;
@@ -440,7 +433,6 @@ function createWalls() {
     }
 }
 
-// Fonction pour créer le sol de la scène
 function createFloor() {
     const floorGeometry = new THREE.PlaneGeometry(5, 5);
     const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
@@ -451,21 +443,18 @@ function createFloor() {
     objects.push(floor);
 }
 
-// Fonction pour gérer la redimension de la fenêtre
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Fonction d'animation de la scène
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
     renderer.render(scene, camera);
 }
 
-// Fonction pour sauvegarder une action dans l'historique
 function saveAction(action, object, texture = null) {
     actionHistory.push({
         action: action,
@@ -477,7 +466,6 @@ function saveAction(action, object, texture = null) {
     redoStack = [];
 }
 
-// Fonction pour définir le mode de transformation (translation ou rotation)
 function setTransformMode(mode) {
     if (['translate', 'rotate'].includes(mode)) {
         transformControls.setMode(mode);
@@ -486,7 +474,6 @@ function setTransformMode(mode) {
     }
 }
 
-// Fonction pour appliquer les dimensions du sol et des murs
 function applySurfaceDimensions() {
     const floorWidth = parseFloat(document.getElementById('floorWidth').value) || 5;
     const floorDepth = parseFloat(document.getElementById('floorDepth').value) || 5;
@@ -516,7 +503,6 @@ function applySurfaceDimensions() {
     alert('Dimensions du sol et des murs appliquées avec succès.');
 }
 
-// Fonction pour mettre à jour le nombre de carreaux
 function updateTileCount() {
     // Calcul du nombre de carreaux pour le sol
     const floorTileX = Math.ceil(floor.geometry.parameters.width / currentTileWidth);
@@ -538,7 +524,6 @@ function updateTileCount() {
     }
 }
 
-// Fonction pour sauvegarder la scène
 function saveScene() {
     try {
         const sceneData = {
@@ -567,7 +552,6 @@ function saveScene() {
     }
 }
 
-// Fonction pour sauvegarder la scène en tant qu'image
 function saveSceneAsImage() {
     try {
         renderer.render(scene, camera);
@@ -586,7 +570,6 @@ function saveSceneAsImage() {
     }
 }
 
-// Fonction pour charger les textures depuis un fichier JSON
 function loadTexturesFromJson() {
     fetch('merged.json')
         .then(response => response.json())
@@ -604,7 +587,6 @@ function loadTexturesFromJson() {
         .catch(error => console.error('Erreur de chargement des textures depuis merged.json:', error));
 }
 
-// Fonction pour gérer le chargement de modèles 3D
 function handleModelFile(event) {
     const file = event.target.files[0];
     const type = event.target.dataset.type;
@@ -634,7 +616,6 @@ function handleModelFile(event) {
     }
 }
 
-// Fonction pour gérer le chargement d'un modèle et l'ajouter à la scène
 function handleModelLoad(model, type) {
     model.rotation.set(0, 0, 0);
     model.scale.set(1, 1, 1);
@@ -648,7 +629,6 @@ function handleModelLoad(model, type) {
     else if (type === 'bidet') bidetModel = model;
 }
 
-// Fonction pour centrer un modèle 3D chargé
 function centerModel(model) {
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
@@ -663,7 +643,6 @@ function centerModel(model) {
     model.position.z = -2.4;
 }
 
-// Fonction pour gérer les interactions par clic
 function handleInteraction(event) {
     event.preventDefault();
 
@@ -713,7 +692,6 @@ function handleInteraction(event) {
     }
 }
 
-// Fonction pour gérer le double clic sur un objet
 function handleDoubleClick(object) {
     // Permettre le double clic seulement pour les objets sanitaires
     if (objects.includes(object) && object.userData.isMovable) {
@@ -725,7 +703,6 @@ function handleDoubleClick(object) {
     }
 }
 
-// Fonction pour gérer le triple clic sur un objet ou mur
 function handleTripleClick(object) {
     // Permettre le triple clic seulement pour changer les dimensions et textures du sol ou des murs
     if (object === floor || walls.includes(object)) {
@@ -736,7 +713,6 @@ function handleTripleClick(object) {
     }
 }
 
-// Fonction pour sélectionner un objet dans la scène
 function selectObject(object) {
     // Monte jusqu'à l'objet parent si l'objet sélectionné est un sous-mesh
     while (object.parent && object.parent !== scene) {
@@ -774,7 +750,6 @@ function selectObject(object) {
     }
 }
 
-// Fonction pour ajouter un objet à la scène
 function addObject(model, type) {
     model.userData.type = type;
     model.userData.isMovable = true; // Assure que l'objet est déplaçable
@@ -784,7 +759,6 @@ function addObject(model, type) {
     saveAction('add', model);
 }
 
-// Fonction pour supprimer l'objet sélectionné
 function removeObject() {
     if (selectedObject && selectedObject.userData.isMovable) {
         saveAction('remove', selectedObject);
@@ -798,7 +772,6 @@ function removeObject() {
     }
 }
 
-// Fonction pour annuler la dernière action
 function undoLastAction() {
     if (actionHistory.length > 0) {
         const lastAction = actionHistory.pop();
@@ -829,7 +802,6 @@ function undoLastAction() {
     }
 }
 
-// Fonction pour rétablir la dernière action annulée
 function redoLastAction() {
     if (redoStack.length > 0) {
         const lastRedo = redoStack.pop();
@@ -858,7 +830,6 @@ function redoLastAction() {
     }
 }
 
-// Fonction pour réinitialiser la scène
 function clearScene() {
     objects.forEach(obj => scene.remove(obj));
     walls = [];
