@@ -531,3 +531,38 @@ canvas {
         bottom: 50px;  /* Ajustez cette valeur pour les appareils mobiles */
     }
 }
+
+
+
+.persistent-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1001;
+    transition: opacity 0.3s ease;
+}
+
+.fullscreen-mode .persistent-controls {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.fullscreen-mode .persistent-controls:hover {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.persistent-controls .btn {
+    background-color: rgba(52, 152, 219, 0.7);
+}
+
+.persistent-controls .btn:hover {
+    background-color: rgba(52, 152, 219, 1);
+}
+
+
+.modal.hidden {
+    display: none;
+}
+
+
