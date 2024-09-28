@@ -6,13 +6,15 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+   
 }
 
 canvas {
     display: block;
     width: 100%;
     height: calc(100vh - 50px);
-    filter: drop-shadow(0 50px 20px #0009);
+   
+    
 }
 
 /* Contrôles et boutons */

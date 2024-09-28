@@ -49,7 +49,9 @@ function init() {
 }
 function initScene() {
     scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xFFFFFF); // Modifiez ce code couleur pour personnaliser l'arrière-plan
 }
+
 
 function initCamera() {
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
