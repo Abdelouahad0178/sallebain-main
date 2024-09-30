@@ -1156,8 +1156,23 @@ document.addEventListener('fullscreenchange', () => {
     updatePersistentControls();
 });
 
+
+
+
 // Initialiser la scène à l'ouverture
 window.addEventListener('load', init);
 
+
+
+
 // Lancer l'animation
 animate();
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('contextmenu', function(event) {
+        event.preventDefault();
+    });
+});
+
