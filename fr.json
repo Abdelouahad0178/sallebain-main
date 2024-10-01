@@ -1,0 +1,21 @@
+{
+    "addSink": "Ajouter Sanitaire",
+    "addMirror": "Ajouter Miroir",
+    "addBidet": "Ajouter Bidet",
+    "removeObject": "Supprimer",
+    "undoAction": "Annuler",
+    "redoAction": "Rétablir",
+    "importTile": "Importer Carrelage",
+    "saveImage": "Sauvegarder l'image",
+    "translate": "Déplacement",
+    "rotate": "Rotation",
+    "applyDimensions": "Appliquer Dimensions",
+    "reset": "Mise à Zéro",
+    "chooseTileType": "Choisissez le type de carrelage",
+    "singleTile": "Un seul carrelage",
+    "doubleTile": "Deux carrelages en alternance",
+    "orientation": "Orientation",
+    "horizontal": "Horizontale",
+    "vertical": "Verticale",
+    "close": "Fermer"
+  }

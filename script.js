@@ -1085,22 +1085,6 @@ function handleTileTextureInput(event) {
     }
 }
 
-function loadTexturesFromJson() {
-    fetch('merged.json')
-        .then(response => response.json())
-        .then(data => {
-            const texturePalette = document.getElementById('texturePalette');
-            data.forEach(texture => {
-                const img = document.createElement('img');
-                img.src = texture.src;
-                img.alt = texture.alt;
-                img.classList.add('texture-option');
-                texturePalette.appendChild(img);
-            });
-            initializeTextureEvents();
-        })
-        .catch(error => console.error('Erreur de chargement des textures depuis merged.json:', error));
-}
 
 function toggleFullscreen() {
     if (!document.fullscreenElement) {

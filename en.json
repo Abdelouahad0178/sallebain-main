@@ -1,0 +1,21 @@
+{
+    "addSink": "Add Sink",
+    "addMirror": "Add Mirror",
+    "addBidet": "Add Bidet",
+    "removeObject": "Remove",
+    "undoAction": "Undo",
+    "redoAction": "Redo",
+    "importTile": "Import Tile",
+    "saveImage": "Save Image",
+    "translate": "Move",
+    "rotate": "Rotate",
+    "applyDimensions": "Apply Dimensions",
+    "reset": "Reset",
+    "chooseTileType": "Choose tile type",
+    "singleTile": "Single tile",
+    "doubleTile": "Two alternating tiles",
+    "orientation": "Orientation",
+    "horizontal": "Horizontal",
+    "vertical": "Vertical",
+    "close": "Close"
+  }
